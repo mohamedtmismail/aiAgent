@@ -7,24 +7,24 @@ from dotenv import load_dotenv
 
 def main():
     load_dotenv()
+    api_key = os.environ.get("GEMINI_API_KEY")
+    client = genai.Client(api_key=api_key)
 
-    args = sys.argv[1:]
 
-    if not args:
+    if len(sys.argv) < 2:
         print("AI Code Assistant")
         print('\nUsage: python main.py "your prompt here"')
         print('Example: python main.py "How do I build a calculator app?"')
         sys.exit(1)
-    
+        
+    args = sys.argv[1:]
     verbose = False
     if '--verbose' in args:
         verbose = True
         args.remove('--verbose')
 
     user_prompt = " ".join(args)
-    api_key = os.environ.get("GEMINI_API_KEY")
-    client = genai.Client(api_key=api_key)
-
+    
     user_prompt = " ".join(args)
     if verbose:
         print(f'User prompt: "{user_prompt}"')
