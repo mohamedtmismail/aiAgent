@@ -4,8 +4,10 @@ import os
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+
+from functions.call_function import available_functions, call_function
 from prompts import system_prompt
-from functions.get_files_info import schema_get_files_info
+
 
 def main():
     parser = argparse.ArgumentParser(description="AI Code Assistant")
@@ -27,35 +29,37 @@ def main():
 
 
 def generate_content(client, messages, verbose):
-    
-    available_functions = types.Tool(
-    function_declarations=[schema_get_files_info],
-    )
-    
-    config=types.GenerateContentConfig(
-        tools=[available_functions],
-        system_instruction=system_prompt,)
-    
     response = client.models.generate_content(
         model="gemini-2.5-flash",
         contents=messages,
-        config=config
+        config=types.GenerateContentConfig(
+            tools=[available_functions], system_instruction=system_prompt
+        ),
     )
-    
     if not response.usage_metadata:
         raise RuntimeError("Gemini API response appears to be malformed")
-    
-    if response.function_calls:
-        for function_call_part in response.function_calls:
-            print(f"calling function: {function_call_part.name}({function_call_part.args})")
-    else:
-        print(response.text)
 
     if verbose:
         print("Prompt tokens:", response.usage_metadata.prompt_token_count)
         print("Response tokens:", response.usage_metadata.candidates_token_count)
-    print("Response:")
-    print(response.text)
+
+    if not response.function_calls:
+        print("Response:")
+        print(response.text)
+        return
+
+    function_responses = []
+    for function_call in response.function_calls:
+        result = call_function(function_call, verbose)
+        if (
+            not result.parts
+            or not result.parts[0].function_response
+            or not result.parts[0].function_response.response
+        ):
+            raise RuntimeError(f"Empty function response for {function_call.name}")
+        if verbose:
+            print(f"-> {result.parts[0].function_response.response}")
+        function_responses.append(result.parts[0])
 
 
 if __name__ == "__main__":
